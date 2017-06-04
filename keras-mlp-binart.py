@@ -1,29 +1,34 @@
 import time
 import numpy as np
 import pandas as pd
+from pandas import ExcelWriter
 from keras.models import Sequential
 from keras.optimizers import SGD
+from keras.optimizers import Nadam
+from keras.optimizers import Adam
+from keras.optimizers import Adagrad
 from keras.layers import Dense, Dropout
 from keras import regularizers as R
 from keras import backend as K
 
 #---------------- Put training and test data file in the same folder as py code
 #Training data file name
-data_file_name = "output.xlsx"
+data_file_name = "outputDates.xlsx"
 #Test/validation data file name (toggle comment if different from data file name)
 test_filename = data_file_name
 #test_file_name = "FAH1002.xlsx"
 
+########## set global variables
 alpha = 0.001  # momentum rate (Default = 0.1)
 min_gradient  = .0001 #minimum gradient updates allowed. if updates are too small, stop training
 hidden_factor = 2 #scaling factor for number of hidden layer nodes
 L1_reg = 0. # L1 norm (absolute sum of all weights) regulation (Default = 0.01)
 L2_reg = 0.0001 # L2 norm (square sum of all weights) regulation (Default = 0.01)
 alpha_lr = .01 #learning rate
-n_epochs = 400
-drop_out = 0.1
-n_batch = 2
-
+n_epochs = input('Number of epochs: ')
+drop_out = 0.15
+n_batch = 36
+newpath = 'c:\\\TARS\PhD\Keras'   #example output path
 
 ### - Load data from excel file function
 def load_file(datafile,worksheet=0,type_data="Input Training"):
@@ -35,7 +40,7 @@ def load_file(datafile,worksheet=0,type_data="Input Training"):
                 header=0,         #assumes 1st row are header names
                 skiprows=None, 
                 skip_footer=0, 
-                index_col=None, 
+                index_col=0,    #first column is index
                 parse_cols=None, #default = None
                 parse_dates=False, 
                 date_parser=None, 
@@ -113,7 +118,11 @@ model.add(Dense(n_outputs,
                 activation='sigmoid'))
 
 #prepare optimizer
-sgd = SGD(lr = alpha_lr, decay = 0., momentum = alpha, nesterov=False)
+sgd = SGD(lr = alpha_lr, decay = 0., momentum = alpha, nesterov=True)
+nadam = Nadam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
+adam = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+adagrad = Adagrad(lr=0.01, epsilon=1e-08, decay=0.0)
+
 #sgd = SGD(lr = alpha_lr)
             #lr: float >= 0. Learning rate.
             #momentum: float >= 0. Parameter updates momentum.
@@ -123,14 +132,13 @@ sgd = SGD(lr = alpha_lr, decay = 0., momentum = alpha, nesterov=False)
 #build model
 
 start_train = time.clock()
-model.compile(loss='binary_crossentropy',  optimizer=sgd)
+model.compile(loss='binary_crossentropy',  optimizer = nadam)
 
 #train model using training data set
 model.fit(x_train, y_train,
           epochs=n_epochs,
           batch_size= n_batch)
 
-'''
 print "Model trained....testing model.."
 
 #load test data
@@ -143,17 +151,25 @@ N_test = len(x_test) # Number of test samples minus header
 
 Xtest_list = x_test.tolist()
 
-score = model.evaluate(x_test, y_test, batch_size=128)
-'''
-out = (model.predict_proba(x_train) > .5) + 0.
-tot_err = np.absolute(out - y_train)
+#score = model.evaluate(x_test, y_test, batch_size=128)
+
+out = (model.predict_proba(x_test) > .5) + 0.
+tot_err = np.absolute(out - y_test)
 tot_err_per = np.sum(tot_err)/(N*n_outputs)
 
-end_train = time.clock()    
+end_train = time.clock() ###### stop training clock 
+  
 if (end_train-start_train > 60):
-    print"\n Trained in {0:.2f} minutes with {1:6i} data points".format((end_train-start_train)/60., N)
+    print"\n Trained in {0:.2f} minutes with {1} data points".format((end_train-start_train)/60., N)
 else:
     print"\n Trained in {0:.2f} seconds with {1} data points".format((end_train-start_train)/1.,N)
     #print" with", N, "data points"
 
 print " Error = {0:.2f}%".format(tot_err_per * 100)
+
+filename = 'FinalError.xlsx'    #example output file
+writer = ExcelWriter(filename)
+pd.DataFrame(tot_err).to_excel(writer,'FinalError')
+
+print'File saved in ', newpath + '\\' + filename
+
