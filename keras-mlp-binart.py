@@ -137,6 +137,7 @@ model.compile(loss='binary_crossentropy',  optimizer = nadam)
 #train model using training data set
 model.fit(x_train, y_train,
           epochs=n_epochs,
+          shuffle=False,
           batch_size= n_batch)
 
 print "Model trained....testing model.."
