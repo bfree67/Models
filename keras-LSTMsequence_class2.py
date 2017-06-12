@@ -85,7 +85,7 @@ else:
     print"\nWhich data file would you like to use?"  # print list of files
     for data_i in range (len(data_files)):
         print data_i, data_files[data_i]
-    d_num = raw_input('Choose a number: ')
+    d_num = int(raw_input('Choose a number: '))
     if d_num > len(data_files): #if out of range, use a default
         d_num = 0
         print"\nValue out of range. Using {0} for data".format(data_files[0])
