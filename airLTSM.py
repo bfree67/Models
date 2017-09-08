@@ -1,7 +1,33 @@
 '''
-LSTM RNN for predicting timeseries
+LSTM RNN using Keras libraries for predicting an individual timeseries based 
+on multivariate inputs. Takes data in csv column format (each col is variable 
+with first row header). 
 
+Provides user input to:
+    - select time series to be predicted, 
+    - amount of horizon units to predict, 
+    - # of epochs to train, and 
+    - # of look-back recurrent cells.
 
+Also asks if the data should be processed - if yes, converts data to a 0-1 scale
+based on the column for training. Cyclic data such as wind direction should be
+pre-coverted to sin/cosine components prior to loading.
+
+Partitions data into training (80%) and testing (20%) sets.
+
+Takes output data (Y) and leads it for future prediction.
+Takes input data (X) and converts into a 3D tensor for Keras based RNN training.
+The tensor dimensions are based on (# of samples, # of look_backs, and # of input variables)
+A sample is the # of variables x # of look_backs - creating a 2D array. Samples
+are prepared by sliding down the list of observations.
+
+X and Y sets (training and test) are adjusted for equal length.
+Input nodes = # of input variables, batch training is set for online (1)
+
+The model is trained and RMSE calculated for training and test sets. The observed 
+and predicted sets are saved in an xlsx file
+
+Brian Freeman 6 Sep 2017
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -49,10 +75,11 @@ for i in range (len(a)):
     print i, a[i]
 
 last_col = np.shape(df)[1] - 1
+print(data_file_name + ' has ' + str(df.shape[0]) + 'observations and ' + str(df.shape[0]) + 'variables')
 
 # pick column to predict
 try:
-    target_col = int(raw_input("Select the column number to predict (default = " + a[last_col] + " : "))
+    target_col = int(raw_input("Select the column number to predict (default = " + a[last_col] + "): "))
 except ValueError:
     target_col = last_col   #choose last column as default
 
@@ -102,17 +129,18 @@ if n < p:
 trainX1 = train[:len(trainY),]
 testX1 = test[:len(testY),]
   
-# get number of epochs (default = 100)
+# get number of epochs
 try:
     n_epochs = int(raw_input("Number of epochs? (Default = 10)? "))
 except ValueError:
     n_epochs = 10
     
-# prepare input Tensors
+# prepare input Tensors by requesting # of recurrent look-backs. Default should be the # of variable in data
 try:
-    look_back = int(raw_input("Number of recurrent (look-back) units? (Default = 8)? "))
+    look_back = int(raw_input("Number of recurrent (look-back) units? (Default = " + str(lead_time) + ")? "))
 except ValueError:
-    look_back = 8
+    look_back = lead_time
+    
 trainX = TensorForm(trainX1, look_back)
 testX = TensorForm(testX1, look_back)
 input_nodes = trainX.shape[2]
@@ -130,7 +158,7 @@ model.add(LSTM(input_nodes, activation='sigmoid', recurrent_activation='tanh',
                 input_shape=(testX.shape[1], trainX.shape[2])))
 model.add(Dense(1))
 model.compile(loss='mean_squared_error', optimizer='nadam')
-model.fit(trainX, trainY, epochs=n_epochs, batch_size=4, verbose=2)
+model.fit(trainX, trainY, epochs=n_epochs, batch_size=1, verbose=2)
 
 # make predictions
 trainPredict = model.predict(trainX)
@@ -143,6 +171,7 @@ testPredict = scalerY.inverse_transform(testPredict)
 testY = scalerY.inverse_transform(testY)
 
 # calculate root mean squared error
+print'Prediction horizon = '+ str(lead_time),'Look back = ' + str(look_back)
 trainScore = math.sqrt(mean_squared_error(trainY, trainPredict))
 print('Train Score: %.2f RMSE' % (trainScore))
 testScore = math.sqrt(mean_squared_error(testY, testPredict))
@@ -153,7 +182,7 @@ stamp = str(time.clock())  #add timestamp for unique name
 stamp = stamp[0:2] 
 
 # generate filename and remove extra periods
-filename = 'FinErr_lstm_'+ str(n_epochs) + '_' + stamp + '.xlsx'    #example output file
+filename = 'FinErr_lstm_'+ str(n_epochs) + str(lead_time) + '_' + stamp + '.xlsx'    #example output file
 if filename.count('.') == 2:
     filename = filename.replace(".", "",1)
 
