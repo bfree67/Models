@@ -75,7 +75,7 @@ for i in range (len(a)):
     print i, a[i]
 
 last_col = np.shape(df)[1] - 1
-print(data_file_name + ' has ' + str(df.shape[0]) + 'observations and ' + str(df.shape[0]) + 'variables')
+print(data_file_name + ' has ' + str(df.shape[0]) + ' observations and ' + str(df.shape[0]) + ' variables')
 
 # pick column to predict
 try:
@@ -137,9 +137,9 @@ except ValueError:
     
 # prepare input Tensors by requesting # of recurrent look-backs. Default should be the # of variable in data
 try:
-    look_back = int(raw_input("Number of recurrent (look-back) units? (Default = " + str(lead_time) + ")? "))
+    look_back = int(raw_input("Number of recurrent (look-back) units? (Default = " + str(lead_time + 2) + ")? "))
 except ValueError:
-    look_back = lead_time
+    look_back = lead_time + 2
     
 trainX = TensorForm(trainX1, look_back)
 testX = TensorForm(testX1, look_back)
@@ -195,8 +195,14 @@ pd.DataFrame(testY).to_excel(writer,'obs_test')
 writer.save()
 print'File saved in ', filename
 
+# make coordinates for line to plot 
+x = [0.,round(testY.max(),0)]
+
 # plot baseline and predictions
 plt.close('all')
-plt.plot(testY)
-plt.plot(testPredict)
+plt.scatter(testY, testPredict)
+plt.plot(x,x, color = 'r')
+plt.xlabel("Observed")
+plt.ylabel("Predicted")
+plt.title("Prediction horizon = "+ str(lead_time) + "/Look back = " + str(look_back))
 plt.show()
