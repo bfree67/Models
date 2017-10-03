@@ -38,12 +38,14 @@ import pandas as pd
 import math
 from pandas import ExcelWriter
 from keras.models import Sequential
-from keras.layers import Dense
+from keras.layers import Dense, Dropout
 from keras.layers import LSTM
+from keras import metrics
 from keras.wrappers.scikit_learn import KerasClassifier
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import time
+import sys
 
 # convert an array of values into a dataset matrix
 def TensorForm(data, look_back):
@@ -73,7 +75,6 @@ np.random.seed(7)
 data_file_name = 'air_dataset.csv'
 df = read_csv(data_file_name, engine='python', skipfooter=3)
 
-
 a = list(df)
 
 for i in range (len(a)):
@@ -89,7 +90,7 @@ except ValueError:
 
 # choose look-ahead to predict   
 try:
-    lead_time =  int(raw_input("How many hours ahead to predict (default = 24)?: "))
+    lead_time =  int(raw_input("How many hours ahead to predict (default = 24)? "))
 except ValueError:
     lead_time = 24
     
@@ -144,17 +145,38 @@ except ValueError:
     
 # prepare input Tensors
 try:
-    look_back = int(raw_input("Number of recurrent (look-back) units? (Default = 8)? "))
+    look_back = int(raw_input("Number of recurrent (look-back) units? (Default = " + str(lead_time+2) + ")? "))
 except ValueError:
-    look_back = 8
+    look_back = lead_time+2
+
+# mini-batch size    
+n_batch = 72  
+    
+# get final approval to compile and train
+print'\nInput summary'
+print'Training on ' + a[target_col]
+print'Prediction horizon is ' + str(lead_time)
+print'Number of training epochs is ' + str(n_epochs)
+print'Number of recurrent units is ' + str(look_back)
+print'Number of samples/batch is ' + str(n_batch)
+
+try:
+    contin = raw_input("Continue with model training? (Default = (y)? ")
+except ValueError:
+    contin = "y"
+
+if contin == "n":
+    sys.exit()
+        
+    
 trainX = TensorForm(trainX1, look_back)
 testX = TensorForm(testX1, look_back)
-# input_nodes = trainX.shape[2]
 
 # ***
-# 3) number of neuros / input_nodes increased for the LSTM layer
+# 3) number of neurons / input_nodes increased for the LSTM layer
 # ***
-input_nodes = 50
+#input_nodes = 50
+input_nodes = trainX.shape[2] * 2
 
 # trim target arrays to match input lengths
 if len(trainX) < len(trainY):
@@ -170,24 +192,33 @@ model = Sequential()
 model.add(LSTM(input_nodes, activation='sigmoid', recurrent_activation='tanh', 
                 input_shape=(trainX.shape[1], trainX.shape[2])))
 
+# add dropout for generalization
+model.add(Dropout(0.2))
+
 # 1 neuron on the output layer
 model.add(Dense(1))
 
 # compiles the model
-model.compile(loss='mean_squared_error', optimizer='nadam')
+model.compile(loss='mean_squared_error', optimizer='nadam', metrics = [metrics.mae])
 
 # ***
 # 4) Increased the batch_size to 72. This improves training performance by more than 50 times
 # and loses no accuracy (batch_size does not modify the final result, only how memory is handled)
 # ***
-history = model.fit(trainX, trainY, epochs=n_epochs, batch_size=72, validation_data=(testX, testY), shuffle=False)
+history = model.fit(trainX, trainY, epochs=n_epochs, batch_size=n_batch, validation_data=(testX, testY), shuffle=False)
 
 # ***
 # 5) test loss and training loss graph. It can help understand the optimal epochs size and if the model
 # is overfitting or underfitting.
 # ***
-plt.plot(history.history['loss'], label='train')
-plt.plot(history.history['val_loss'], label='test')
+xhistory = len(history.history['loss'])
+xlin = range(1,xhistory+1)
+plt.close('all')
+plt.plot(xlin,history.history['loss'],color="black", label='Train')
+plt.plot(xlin,history.history['val_loss'], color = "black", linestyle = ':', label='Test')
+plt.xlabel('Epoch')
+plt.ylabel('MSE Loss')
+plt.xticks(np.arange(min(xlin), max(xlin)+1, 1.0))
 plt.legend()
 plt.show()
 
@@ -203,7 +234,7 @@ testY = scalerY.inverse_transform(testY)
 
 # ***
 # 6) calculate mean absolute error. Different than root mean squared error this one
-# is not so "sensitive" to bigger erros (does not square) and tells "how big of an error"
+# is not so "sensitive" to bigger errors (does not square) and tells "how big of an error"
 # we can expect from the forecast on average"
 # ***
 print'Prediction horizon = '+ str(lead_time),'Look back = ' + str(look_back)
@@ -220,28 +251,35 @@ print('Train Score: %.2f RMSE' % (trainScore))
 testScore = math.sqrt(mean_squared_error(testY, testPredict))
 print('Test Score: %.2f RMSE' % (testScore))
 
+########################
+######  write results to file
+try:
+    file_write = raw_input("Save ouput file (y/n)? (Default = n)? ")
+except ValueError:
+    file_write = "n"
 
-# make timestamp for unique filname
-stamp = str(time.clock())  #add timestamp for unique name
-stamp = stamp[0:2] 
+if file_write == "y":
+    # make timestamp for unique filname
+    stamp = str(time.clock())  #add timestamp for unique name
+    stamp = stamp[0:2] 
 
-# generate filename and remove extra periods
-filename = 'FinErr_lstm_'+ str(n_epochs) + str(lead_time) + '_' + stamp + '.xlsx'    #example output file
-if filename.count('.') == 2:
-    filename = filename.replace(".", "",1)
+    # generate filename and remove extra periods
+    filename = 'FinErr_lstm_'+ str(n_epochs) + str(lead_time) + '_' + stamp + '.xlsx'    #example output file
+    
+    if filename.count('.') == 2:
+        filename = filename.replace(".", "",1)
+    writer = ExcelWriter(filename)
+    pd.DataFrame(trainPredict).to_excel(writer,'Train-predict') #save prediction output
+    pd.DataFrame(trainY).to_excel(writer,'obs-train') #save observed output
+    pd.DataFrame(testPredict).to_excel(writer,'Test-predict') #save output training data
+    pd.DataFrame(testY).to_excel(writer,'obs_test') 
+    writer.save()
+    print'File saved in ', filename
 
-#write results to file    
-writer = ExcelWriter(filename)
-pd.DataFrame(trainPredict).to_excel(writer,'Train-predict') #save prediction output
-pd.DataFrame(trainY).to_excel(writer,'obs-train') #save observed output
-pd.DataFrame(testPredict).to_excel(writer,'Test-predict') #save output training data
-pd.DataFrame(testY).to_excel(writer,'obs_test') 
-writer.save()
-print'File saved in ', filename
-
-
+'''
 # plot baseline and predictions
 plt.close('all')
 plt.plot(testY)
 plt.plot(testPredict)
 plt.show()
+'''
