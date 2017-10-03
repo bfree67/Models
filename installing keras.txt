@@ -1,0 +1,6 @@
+Open the Anaconda prompt
+1.Run-> conda update conda
+2. Run-> conda update --all
+3. Run-> conda install mingw libpython
+4. Run->pip install git+git://github.com/Theano/Theano.git
+5. Run-> pip install git+git://github.com/fchollet/keras.git
