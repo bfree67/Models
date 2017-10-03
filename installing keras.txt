@@ -1,6 +1,19 @@
+Install TDM GCC x64. (www.td-gss.tdragon.net)
+Install Anaconda x64.
 Open the Anaconda prompt
 1.Run-> conda update conda
 2. Run-> conda update --all
 3. Run-> conda install mingw libpython
 4. Run->pip install git+git://github.com/Theano/Theano.git
 5. Run-> pip install git+git://github.com/fchollet/keras.git
+
+https://stackoverflow.com/questions/34097988/how-do-i-install-keras-and-theano-in-anaconda-python-on-windows
+
+Ensure Keras is using a theano backend by checking:
+Userprofile/.keras/keras.json
+{
+    "image_data_format": "channels_last",
+    "epsilon": 1e-07,
+    "floatx": "float32",
+    "backend": "theano"
+}
