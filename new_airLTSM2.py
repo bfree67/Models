@@ -64,7 +64,7 @@ np.random.seed(7)
 # ***
 # 1) load dataset
 # ***
-data_file_name = 'air_dataset2.csv'
+data_file_name = 'air_dataset4.csv'
 df = read_csv(data_file_name, engine='python', skipfooter=3)
 
 a = list(df)
@@ -129,9 +129,9 @@ if run_sing == "n":
         var_interval = 10
 
     else: #Prediction Horizon
-        var_start = 8
-        var_end = 48
-        var_interval = 4
+        var_start = 0
+        var_end = 100
+        var_interval = 12
     
     np.random.seed(7) 
     
@@ -139,6 +139,10 @@ if run_sing == "n":
     X_MAE=[]
     MAEtrain = []
     MAEtest = []
+    
+    X_RMSE=[]
+    RMSEtrain = []
+    RMSEtest = []
     
     for var_i in range(var_start, var_end + 1, var_interval):
         
@@ -159,6 +163,10 @@ if run_sing == "n":
             print'\nSamples/batch = ' + str(n_batch)
     
         else: #Prediction Horizon
+            
+            if var_i == 0:
+                var_i = 1
+            
             lead_time = var_i
             look_back = lead_time + 2
             print'\nPrediction horizon = ' + str(lead_time)
@@ -257,14 +265,30 @@ if run_sing == "n":
         X_MAE.append(var_i)
         MAEtrain.append(trainScore)
         MAEtest.append(testScore)
+        
+        # calculate root mean squared error. 
+        # weights "larger" errors more by squaring the values when calculating
+        print'Prediction horizon = '+ str(lead_time),'Look back = ' + str(look_back)
+        trainScore = math.sqrt(mean_squared_error(trainY, trainPredict))
+        print('Train Score: %.2f RMSE' % (trainScore))
+        testScore = math.sqrt(mean_squared_error(testY, testPredict))
+        print('Test Score: %.2f RMSE' % (testScore))
+        
+        X_RMSE.append(var_i)
+        RMSEtrain.append(trainScore)
+        RMSEtest.append(testScore)
     
     #### end of sensitivity testing
     print'\n****** Selected variable was ' + b[run_col]
     X_MAE = np.asmatrix(X_MAE).T
     MAEtrain = np.asmatrix(MAEtrain).T
     MAEtest = np.asmatrix(MAEtest).T
+    XarrayMAE = np.concatenate((X_MAE, MAEtrain,MAEtest), axis = 1)
     
-    Xarray = np.concatenate((X_MAE, MAEtrain,MAEtest), axis = 1)
+    X_RMSE = np.asmatrix(X_RMSE).T
+    RMSEtrain = np.asmatrix(RMSEtrain).T
+    RMSEtest = np.asmatrix(RMSEtest).T
+    XarrayRMSE = np.concatenate((X_RMSE, RMSEtrain,RMSEtest), axis = 1)
 ##########################################################################    
 ##########################################################################
 else:
