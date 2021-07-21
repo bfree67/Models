@@ -441,10 +441,10 @@ def make_plume(source, mwx, prf, pollutant, emission_rate):
                 
                 ## computes half of the plume from the center line ( dy = 0)
     
-                ## calculate beta where C = Q * beta where beta is in [m3/s]
+                ## calculate in ug/m3
                 conc = emission_rate * ((1/(2*math.pi*ws_p*sig_y*sig_z))*
                         math.exp((-dy**2)/(2*sig_y**2))*
-                         (math.exp(-(dz-h_eff)**2/(2*sig_z**2)) + math.exp(-(dz+h_eff)**2/(2*sig_z**2))))
+                         (math.exp(-(dz-h_eff)**2/(2*sig_z**2)) + math.exp(-(dz+h_eff)**2/(2*sig_z**2))))*1e6
                 
                 ## set dictionary parameters
                 coords = {"geometry": {"type": "Point","coordinates":[x, dy, dz]}}
