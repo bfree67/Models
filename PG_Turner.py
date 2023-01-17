@@ -1,32 +1,44 @@
-# -*- coding: utf-8 -*-
 """
 Created on Wed Jun  9 13:27:54 2021
-
 Calculate Pasquill-Gifford (P-G) Stability Category based on
 -latitude/longitude 
 -time
 -Cloud coverage and ceiling
 -Wind speed
-
 Time is set to UTC
-
 Uses Turner method to determine P-G categories
 https://www.epa.gov/sites/production/files/2020-10/documents/mmgrma_0.pdf
 http://www.webmet.com/met_monitoring/641.html
-
 @author: Brian
 """
 
 from pysolar.solar import get_altitude
 import datetime
+import pytz # added
 import string
+import sys
+
+'''
+changes made to solar_altitude() function to account for date default
+Assumes date is supplied as 24 hr datetime object - should be referenced to UTC
+
+'''
 
 def solar_altitude(lat = 42.206, long = -71.382, 
-                   date = datetime.datetime.now(datetime.timezone.utc)):
+                   date = datetime.datetime.now()):
     
-    ## calculate solar altitude based on lat/long and time of observer
+    '''
     
-    altitude = round(get_altitude(lat, long, date),1)
+    calculates solar altitude based on lat/long and time of observer
+    has default lat/long as uses time of request
+    
+    input datetime must be UTC
+    
+    '''
+    
+    date_tz = date.astimezone()  # assume date is in UTC
+    
+    altitude = round(get_altitude(lat, long, date_tz),1) # get_altitude from pysolar lib
     
     if altitude <= 0:
         altitude = 0
@@ -35,8 +47,12 @@ def solar_altitude(lat = 42.206, long = -71.382,
 
 def insolation_class(solar_altitude):
     
-    # select insolation class number based on solar altitude
+    '''
     
+    select insolation class number based on solar altitude
+    calculated with function solar_attitude()
+    
+    '''
     if solar_altitude > 60:
         insol_class = 4
     
@@ -53,8 +69,12 @@ def insolation_class(solar_altitude):
 
 def nri(sol_alt, cloud_cover,cloud_ceiling):
     
-    # calculate Net Radiation Index (NRI) using cloud coverage (1 - 10) and cloud ceiling in ft
-    # calls insolation_class() to get base NRI
+    '''
+    
+    calculate Net Radiation Index (NRI) using cloud coverage (1 - 10) and cloud ceiling in ft
+    calls function insolation_class() to get base NRI
+    
+    '''
     
     nr_index = insolation_class(sol_alt)
     nr_mod = 0
@@ -72,7 +92,11 @@ def nri(sol_alt, cloud_cover,cloud_ceiling):
 
 def wind_class(ws):
     
-    ## create wind speed index based on wind speed in [m/s]
+    '''
+    
+    create wind speed index based on wind speed in [m/s]
+    
+    '''
     
     if ws < 0.8:
         wc = 0
@@ -103,9 +127,15 @@ def wind_class(ws):
         
     return wc
 
-def PG_cat(ws, lat, long, cloud_cover, cloud_ceiling):
+def PG_cat(ws, lat, long, cloud_cover, cloud_ceiling, obs_date):
     
-    ## PG classes into a dictionary where list rank goes NRI 4, 3, 2, 1, 0, -1, -2
+    '''
+    
+    PG classes into a dictionary where list rank goes NRI 4, 3, 2, 1, 0, -1, -2
+    
+    added observation date (in UTC) datetime format
+    
+    '''
     pg_dict = {0: [1,1,2,3,4,6,7],
                1: [1,2,2,3,4,6,7],
                2: [1,2,3,4,4,5,6],
@@ -119,7 +149,7 @@ def PG_cat(ws, lat, long, cloud_cover, cloud_ceiling):
     # make list of upper case characters A, B, C, D...
     char_list = list(string.ascii_uppercase)
     
-    sol_alt = solar_altitude(lat, long)
+    sol_alt = solar_altitude(lat, long, obs_date)
     
     nri_new = nri(sol_alt, cloud_cover, cloud_ceiling)
     
@@ -128,14 +158,45 @@ def PG_cat(ws, lat, long, cloud_cover, cloud_ceiling):
     
     return pg_char
  
-## Global variables
-
-lat = 61.2      # latitude of observer
-long = -23.3    # longitude of observer
-cloud_cover = 6
-cloud_ceiling = 8000
-ws = 5
-
-###### start program
-
-#print(PG_cat(ws,lat, long, cloud_cover, cloud_ceiling))
+def ppm_ug_m3(C_ppm, MW_value, T_c = 25, P_atm = 1):
+    
+    '''
+    
+    convert concentration in ppm to ug/m3
+    default Temperature and pressure are STP (1 atm and 25 deg C)
+    added 21 Sep 2022
+    
+    '''
+    
+    if type(MW_value) == int or type(MW_value) == float:
+        MW = MW_value
+        
+    else:
+        # MW_value is a string and therefore make a dictionay of MW values
+        # make dictionary of pollutant MW in g/m3
+        # ref: https://teesing.com/en/library/tools/ppm-mg3-converter
+        MW_dict = { 
+                  'H2S': 34.08,
+                  'CO': 28.01,
+                  'DMS': 62.13,
+                  'SO2': 64.06,
+                  'NO2': 46.0,
+                  'NO': 30,
+                  'NH3': 17.03,
+                  'VOC': 78.95,
+                  'CH4': 16.04
+                  }
+        
+        #if MW pollutant is not in the list, quit
+        if MW_value in MW_dict:
+            MW = MW_dict[MW_value]
+            
+        else:
+            print('{} not in the pollutant dictionay'.format(MW_value))
+            sys.quit()
+        
+        
+    T_k = T_c + 273.1 # convert temperature [C] to Kelvin
+    R = 8.205736*(10**-5) # ideal gas constant in [m3⋅atm⋅K−1⋅mol−1]
+    
+    return round(C_ppm * MW * P_atm / (R * T_k), 1)
