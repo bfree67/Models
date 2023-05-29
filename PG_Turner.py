@@ -136,8 +136,8 @@ def PG_cat(ws, lat, long, cloud_cover, cloud_ceiling, obs_date):
     added observation date (in UTC) datetime format
     
     '''
-    pg_dict = {0: [1,1,2,3,4,6,7],
-               1: [1,2,2,3,4,6,7],
+    pg_dict = {0: [1,1,2,3,4,6,6],
+               1: [1,2,2,3,4,6,6],
                2: [1,2,3,4,4,5,6],
                3: [2,2,3,4,4,5,6],
                4: [2,2,3,4,4,4,5],
