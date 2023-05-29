@@ -123,7 +123,7 @@ def wind_class(ws):
         wc = 7
         
     if ws >= 5.9:
-        wc = 6
+        wc = 8
         
     return wc
 
